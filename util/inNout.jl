@@ -17,7 +17,7 @@ function parseCommandLine(; dir=0)
                  arg_type = String
                  default = pwd()
 			"--pathOut", "-o"         # another option, with short form
-                 help = "Directory where everything will be saved. This directory can be created before or during execution."
+                 help = "Directory where everything will be saved. This directory can be created before or during execution. Default is a new directory named after the filename, located where the filename is."
                  arg_type = String
                  default = "temp"
            "--n", "-N"
@@ -25,7 +25,7 @@ function parseCommandLine(; dir=0)
 					arg_type = Int
                     default = 300
 			"--mass", "-m"
-                     help = "number of particles"
+                     help = "mass"
  					arg_type = Float32
                      default = 1.0f0
            "--Lchar", "-L"
@@ -33,7 +33,7 @@ function parseCommandLine(; dir=0)
                 arg_type = Float32
                 default = 42.2976f0
            "--t_max", "-t"
-                help = "t maximum"
+                help = "t maximum. NO LONGER NEEDED"
                 arg_type = Int64
                 default = 0
 			"--dt", "-s"
@@ -49,12 +49,12 @@ function parseCommandLine(; dir=0)
 				arg_type = Int
 				default = 0
 			"--time_window", "-w"
-				help = "List of time window of samples. Should be a  space separated"
+				help = "List of time window of samples. Should be space separated"
 				nargs = '*'
 				arg_type = Int64
 				default = [500, 1000]
 			"--knum", "-k"
-				help = "List with kmin and kmax. Should be a  space separated"
+				help = "List with kmin and kmax. Should be space separated"
 				nargs = '*'
 				arg_type = Int64
 				default = [1, 10]
@@ -66,7 +66,7 @@ end
 function init_dict(kwargs)
 	filename = kwargs["Filename"]
     path_to_file = kwargs["pathIn"] * "/" * kwargs["Filename"]
-    pathout = kwargs["pathOut"] == "temp" ? pwd() * "/" * split(kwargs["Filename"],".")[1] * "/" : kwargs["pathOut"]
+    pathout = kwargs["pathOut"] == "temp" ? kwargs["pathIn"] * "/" * split(kwargs["Filename"],".")[1] * "/" : kwargs["pathOut"]
 
     isdir(pathout) || mkdir(pathout)
     dict = Dict()
@@ -125,10 +125,11 @@ function load_data(dict)
     vz = reshape(data1[:,7],N,:)'
     # samp = Int(floor(t_max/t_sample))
     # d = [(x[r,:],y[r,:],z[r,:],vx[r,:],vy[r,:],vz[r,:]) for r in Iterators.partition(1:t_max,t_sample)][1:samp]
-    @info "Data loaded"
+
     # t_max = t_max == 0 ? end : t_max
     d = t_max != 0 ? (x[1:t_max,:],y[1:t_max,:],z[1:t_max,:],vx[1:t_max,:],vy[1:t_max,:],vz[1:t_max,:]) : (x,y,z,vx,vy,vz)
 	dict[:t_max] = size(x,1)
+	@info "Data loaded. $(dict[:t_max]) configurations detected."
 	d
 end
 
@@ -162,7 +163,7 @@ function savePlots(ω_list, freq_list, CT, CT_arr, dict; flag="T")
 	# Correlation in mixed windows
 	figs_CT = []
     for k in 1:size(CT,1)
-        f_CT = plot(CT[k,1:200,1],CT[k,1:200,2], frame=:box, xlabel="freq (1/$dim)", ylabel="CT", label="k = $k", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+        f_CT = plot(CT[k,1:200,1],CT[k,1:200,2], frame=:box, xlabel="freq (1/$dim)", ylabel="C$(flag)", label="k = $k", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
         push!(figs_CT, f_CT)
     end
 
@@ -180,7 +181,7 @@ function savePlots(ω_list, freq_list, CT, CT_arr, dict; flag="T")
 
         for k in 1:size(CT_arr,2)
 			tw2 = Int(floor(tw/2))
-            f_CT_arr = plot(CT_arr[1:tw2,k,2,s], CT_arr[1:tw2,k,1,s], frame=:box, xlabel="freq (1/$dim)", ylabel="CT", label="k = $k, Time Window $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+            f_CT_arr = plot(CT_arr[1:tw2,k,2,s], CT_arr[1:tw2,k,1,s], frame=:box, xlabel="freq (1/$dim)", ylabel="C$(flag)", label="k = $k, Time Window $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
             push!(figs_CT_arr, f_CT_arr)
         end
     end

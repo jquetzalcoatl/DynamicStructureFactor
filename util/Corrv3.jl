@@ -137,7 +137,7 @@ function get_ω_sample(data, dict, c::Bool)
 	for (j, ts) in enumerate(dict[:t_samp_list])
         # ts = t_samp_list[j]
         d_part, t_m = partition_data(data, ts, dict)
-        @info "$j : t_samp set to $ts. $(dict[:partitions][:samples][end]) samples."
+        @info "$j : t_samp set to $ts timesteps. $(dict[:partitions][:samples][end]) samples for given t_samp."
         if dict[:partitions][:t_samp][end] * dict[:partitions][:samples][end] != dict[:partitions][:t_max][end]
             @warn "t_sample x n_sample does NOT equal t_m"
             break
