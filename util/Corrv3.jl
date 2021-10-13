@@ -1,4 +1,4 @@
-using Plots, Statistics, FFTW, SparseArrays, LinearAlgebra#, JLD
+using Statistics, FFTW, LinearAlgebra#, JLD
 # using BSON: @save, @load
 # using DelimitedFiles, ArgParse,
 include("./inNout.jl")
@@ -68,7 +68,7 @@ function partition_data(d, t_sample, dict)
 end
 
 
-function get_Corr_over_all_samples(d, dict; in_Fourier=false)
+function get_Corr_over_all_samples(d, dict; in_Fourier=false, flag="Transversal")
 
     data = d[1]
 	N = dict[:num_part]
@@ -79,19 +79,35 @@ function get_Corr_over_all_samples(d, dict; in_Fourier=false)
 	L = dict[:L_char]
 	m = dict[:mass]
 
-	@info "Sample 1"
-    CT, CTIm = get_Corr(data, N, t_samp; kmin = kmin, kmax = kmax, L = L, m=m)
-    CT_av, CTIm_av = reshape(CT,1,kmax-kmin+1,t_samp), reshape(CTIm,1,kmax-kmin+1,t_samp)
-    for i in 2:samp
-        @info "Sample $i"
-        data = d[i]
-        CT, CTIm = get_Corr(data, N, t_samp; kmin = kmin, kmax = kmax, L = L, m=m)
+	@info "Computing $flag part"
+	if flag == "Transversal"
+		@info "Sample 1"
+	    CT, CTIm = getTransversalCorrelationFunction(data, N, t_samp; kmin = kmin, kmax = kmax, L = L, m=m)
+	    CT_av, CTIm_av = reshape(CT,1,kmax-kmin+1,t_samp), reshape(CTIm,1,kmax-kmin+1,t_samp)
+	    for i in 2:samp
+	        @info "Sample $i"
+	        data = d[i]
+	        CT, CTIm = getTransversalCorrelationFunction(data, N, t_samp; kmin = kmin, kmax = kmax, L = L, m=m)
 
-        CT_av = vcat(CT_av, reshape(CT,1,kmax-kmin+1,t_samp))
-        CTIm_av = vcat(CTIm_av, reshape(CTIm,1,kmax-kmin+1,t_samp))
-    end
+	        CT_av = vcat(CT_av, reshape(CT,1,kmax-kmin+1,t_samp))
+	        CTIm_av = vcat(CTIm_av, reshape(CTIm,1,kmax-kmin+1,t_samp))
+	    end
+		return do_the_fou(CT_av, CTIm_av, t_samp; in_Fourier, L)
+	elseif flag == "Longitudinal"
+		@info "Sample 1"
+		CL, CLIm = getLongitudinalCorrelationFunction(data, N, t_samp; kmin = kmin, kmax = kmax, L = L, m=m)
+	    CL_av, CLIm_av = reshape(CL,1,kmax-kmin+1,t_samp), reshape(CLIm,1,kmax-kmin+1,t_samp)
+	    for i in 2:samp
+	        @info "Sample $i"
+	        data = d[i]
+			CL, CLIm = getLongitudinalCorrelationFunction(data, N, t_samp; kmin = kmin, kmax = kmax, L = L, m=m)
+
+			CL_av = vcat(CL_av, reshape(CL,1,kmax-kmin+1,t_samp))
+	        CLIm_av = vcat(CLIm_av, reshape(CLIm,1,kmax-kmin+1,t_samp))
+	    end
+		return do_the_fou(CL_av, CLIm_av, t_samp; in_Fourier, L)
+	end
 	# return CT_av, CTIm_av
-	do_the_fou(CT_av, CTIm_av, t_samp; in_Fourier, L)
 end
 
 function do_the_fou(CT_av, CTIm_av, tmax; kmin = 1, kmax = 10,
@@ -112,8 +128,10 @@ function get_ω_sample(data, dict, c::Bool)
     # t_samp_list = t_samp_list == 0 ? [1000,2000,5000] : t_samp_list
     # n_samp = Int.(floor.(t_max ./ dict[:t_samp_list]))
 
-    ω_list = zeros(size(dict[:t_samp_list],1),dict[:knum][2]-dict[:knum][1] + 1)
+    ωT_list = zeros(size(dict[:t_samp_list],1),dict[:knum][2]-dict[:knum][1] + 1)
+	ωL_list = zeros(size(dict[:t_samp_list],1),dict[:knum][2]-dict[:knum][1] + 1)
 	CT_arr = zeros(maximum(dict[:t_samp_list]),dict[:knum][2]-dict[:knum][1] + 1,2,size(dict[:t_samp_list],1))
+	CL_arr = zeros(maximum(dict[:t_samp_list]),dict[:knum][2]-dict[:knum][1] + 1,2,size(dict[:t_samp_list],1))
 
     # for j in 1:size(t_samp_list,1)
 	for (j, ts) in enumerate(dict[:t_samp_list])
@@ -125,25 +143,38 @@ function get_ω_sample(data, dict, c::Bool)
             break
         end
 
-        CT, _ = get_Corr_over_all_samples(d_part, dict; in_Fourier = c)
+        CT, _ = get_Corr_over_all_samples(d_part, dict; in_Fourier = c, flag = "Transversal")
+		CL, _ = get_Corr_over_all_samples(d_part, dict; in_Fourier = c, flag = "Longitudinal")
 
 
 		ωlim = Int(floor(ts/2))
-        ω_list[j,:] = vcat([findall(x->x == maximum(CT[1:ωlim,i]), CT[1:ωlim,i]) for i in 1:size(CT,2)]...)
 
-		freq = hcat([[l for l in 0:size(CT,1)-1] ./ (ts * dict[:dt]) for i in 1:size(CT,2)]...)
-		CT_arr[1:size(CT,1),:,:,j] = cat(CT,freq, dims=3)
+        ωT_list[j,:] = vcat([findall(x->x == maximum(CT[1:ωlim,i]), CT[1:ωlim,i]) for i in 1:size(CT,2)]...)
+
+		freqT = hcat([[l for l in 0:size(CT,1)-1] ./ (ts * dict[:dt]) for i in 1:size(CT,2)]...)
+		CT_arr[1:size(CT,1),:,:,j] = cat(CT,freqT, dims=3)
+
+		# ωLlim = Int(floor(ts/2))
+        ωL_list[j,:] = vcat([findall(x->x == maximum(CL[1:ωlim,i]), CL[1:ωlim,i]) for i in 1:size(CL,2)]...)
+
+		freqL = hcat([[l for l in 0:size(CL,1)-1] ./ (ts * dict[:dt]) for i in 1:size(CT,2)]...)
+		CL_arr[1:size(CL,1),:,:,j] = cat(CL,freqL, dims=3)
     end
-    freq_list = hcat([(ω_list[i,:] .- 1) ./(ts * dict[:dt]) for (i,ts) in enumerate(dict[:t_samp_list])]...)
-    # ω_list, freq_list, arrange_CT_arr(CT_arr; len=Int(floor(minimum(t_samp_list)/2)), Δk = kmax-kmin + 1)
-	CT_arrv2 = CT_arr
-	CT_arr = arrange_CT_arr(CT_arr; len=Int(floor(minimum(dict[:t_samp_list])/2)), Δk = dict[:knum][2]-dict[:knum][1] + 1)
-	CT_arr = envelope.([CT_arr[i,:,:] for i in 1:dict[:knum][2]-dict[:knum][1] + 1])
-	corr = permutedims(cat(CT_arr...,dims=3),(3,1,2))
-	ω_list, freq_list, corr, CT_arrv2
+    freqT_list = hcat([(ωT_list[i,:] .- 1) ./(ts * dict[:dt]) for (i,ts) in enumerate(dict[:t_samp_list])]...)
+	freqL_list = hcat([(ωL_list[i,:] .- 1) ./(ts * dict[:dt]) for (i,ts) in enumerate(dict[:t_samp_list])]...)
+
+	CT_mixedWindows = arrange_Corr(CT_arr; len=Int(floor(minimum(dict[:t_samp_list])/2)), Δk = dict[:knum][2]-dict[:knum][1] + 1)
+	CT_mixedWindows = envelope.([CT_mixedWindows[i,:,:] for i in 1:dict[:knum][2]-dict[:knum][1] + 1])
+	CT_mixedWindows = permutedims(cat(CT_mixedWindows...,dims=3),(3,1,2))
+
+	CL_mixedWindows = arrange_Corr(CL_arr; len=Int(floor(minimum(dict[:t_samp_list])/2)), Δk = dict[:knum][2]-dict[:knum][1] + 1)
+	CL_mixedWindows = envelope.([CL_mixedWindows[i,:,:] for i in 1:dict[:knum][2]-dict[:knum][1] + 1])
+	CL_mixedWindows = permutedims(cat(CL_mixedWindows...,dims=3),(3,1,2))
+
+	ωT_list, freqT_list, CT_mixedWindows, CT_arr, ωL_list, freqL_list, CL_mixedWindows, CL_arr
 end
 
-function arrange_CT_arr(CT_arr; len=30, Δk=10)
+function arrange_Corr(CT_arr; len=30, Δk=10)
         t_len=size(CT_arr,4)
         l = [i*len for i in 1:t_len]
         new_CT = zeros(Δk,sum(l),2)
@@ -173,7 +204,7 @@ function envelope(ar)
     ar[ll,:]
 end
 
-function get_freq_max_2(CT_arr)
+function get_freq_max(CT_arr)
         freq_max = zeros(10,2)
         for k in 1:10
                 idx = sortperm(CT_arr[k,:,2])[end]
@@ -203,24 +234,19 @@ end
 function main(dict)
 	# dim = dict[:dim]
 	@info "Starting..."
-	ω_list, freq_list, CT_arr, CT_arrv2 = get_freqs(dict)
+	ω_list, freq_list, CT_mixedWindows, CT_arr, ωL_list, freqL_list, CL_mixedWindows, CL_arr = get_freqs(dict)
 	@info "Computation done"
-	# m = reshape(mean(freq_list, dims=2),:)
-	# st = reshape(std(freq_list, dims=2),:)
-	# fig = plot(1:10, m, ribbon=st, fillalpha=0.2, label="mean", lw=4,
-	#     	frame=:box, xlabel="k (wave number)", ylabel="freq (1/$dim)", legend=:topleft,
-	#     	title=dict[:title], margin = 10Plots.mm, ms=5, markershapes = [:circle], markerstrokewidth=0)
 
-	# fig_name = split(filename,".")[1]
-	# savefig(fig, dict[:PathOut] * "/" * fig_name * ".png")
 	@info "Generating Plots..."
-	savePlots(ω_list, freq_list, CT_arr, CT_arrv2, dict)
-	# writedlm(dict[:PathOut] * "/" * fig_name * "_modes.dat", ω_list')
-	# writedlm(dict[:PathOut] * "/" * fig_name * "_freq.dat", freq_list)
-	# writedlm(dict[:PathOut] * "/" * fig_name * "_Corr.dat", CT_arrv2)
+	savePlots(ω_list, freq_list, CT_mixedWindows, CT_arr, dict, flag="T")
+	savePlots(ωL_list, freqL_list, CL_mixedWindows, CL_arr, dict, flag="L")
+
 	@info "Saving Data..."
-	saveData(ω_list, freq_list, CT_arr, CT_arrv2, dict)
+	saveData(ω_list, freq_list, CT_mixedWindows, CT_arr, dict, flag="T")
+	saveData(ωL_list, freqL_list, CL_mixedWindows, CL_arr, dict, flag="L")
 	@info "Done!"
-	writedlm(dict[:PathOut] * "/" * split(dict[:title],".")[1] * "_freq_method2.dat",
-			get_freq_max_2(CT_arr))
+	writedlm(dict[:PathOut] * "/" * split(dict[:title],".")[1] * "_freq_mixedWindows_T.dat",
+			get_freq_max(CT_mixedWindows))
+	writedlm(dict[:PathOut] * "/" * split(dict[:title],".")[1] * "_freq_mixedWindows_L.dat",
+			get_freq_max(CL_mixedWindows))
 end
