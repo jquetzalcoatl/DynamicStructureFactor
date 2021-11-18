@@ -1,15 +1,16 @@
 using Pkg
 
 dependencies = [
-    "Statistics", 
-    "FFTW", 
+    "Statistics",
+    "FFTW",
     "LinearAlgebra"
-    "Statistics", 
+    "Statistics",
     "SparseArrays",
     "BSON",
-    "Plots", 
-    "ArgParse", 
-    "DelimitedFiles"
+    "Plots",
+    "ArgParse",
+    "DelimitedFiles",
+    "Interpolations"
 ]
 
 Pkg.add(dependencies)
