@@ -151,7 +151,22 @@ function saveData(ω_list, freq_list, CT, CT_arr, dict; flag="T")
 	end
 end
 
-function savePlots(ω_list, freq_list, CT, CT_arr, dict; flag="T")
+function saveData(CT_arr, dict; flag="T")
+	fig_name = split(dict[:title],".")[1]
+	# isdir(dict[:PathOut] * "/" * fig_name * "_CorrelationDataTimeWindowsMixed") || mkdir(dict[:PathOut] * "/" * fig_name * "_CorrelationDataTimeWindowsMixed")
+	# for k in 1:size(CT,1)
+	#     writedlm(dict[:PathOut] * "/" * fig_name * "_CorrelationDataTimeWindowsMixed/C$(flag)_k_$k.dat", CT[k,:,:])
+	# end
+
+	isdir(dict[:PathOut] * "/" * fig_name * "_CorrelationData") || mkdir(dict[:PathOut] * "/" * fig_name * "_CorrelationData")
+	for k in 1:size(CT_arr,2), s in 1:size(CT_arr,4)
+		tw = dict[:t_samp_list][s]
+	    tw2 = Int(floor(tw/2))
+	    writedlm(dict[:PathOut] * "/" * fig_name * "_CorrelationData/C$(flag)_k_$(k)_TW_$tw.dat", [CT_arr[1:tw2,k,2,s] CT_arr[1:tw2,k,1,s]])
+	end
+end
+
+function savePlots(ω_list, freq_list, CT, CT_arr, dict; flag="T", mixedWindows=true)
 	dim = dict[:dim]
 	#Mean frequency over different time windows.
 	m = reshape(mean(freq_list, dims=2),:)
@@ -191,5 +206,38 @@ function savePlots(ω_list, freq_list, CT, CT_arr, dict; flag="T")
 	savefig(plot(figs_CT..., size=(1500,900)), dict[:PathOut] * "/" * fig_name * "_C$(flag).png")
 	savefig(plot(figs_freq..., size=(1500,900)), dict[:PathOut] * "/" * fig_name * "_freq_$(flag).png")
 	savefig(plot(figs_ω..., size=(1500,900)), dict[:PathOut] * "/" * fig_name * "_modes_$(flag).png")
+	savefig(plot(figs_CT_arr..., size=(2500,1900)), dict[:PathOut] * "/" * fig_name * "_C$(flag)_arr.png")
+end
+
+function savePlots(CT_arr, dict; flag="T_im", mixedWindows=true)
+	dim = dict[:dim]
+
+	# # Correlation in mixed windows
+	# figs_CT = []
+    # for k in 1:size(CT,1)
+    #     f_CT = plot(CT[k,1:200,1],CT[k,1:200,2], frame=:box, xlabel="time ($dim)", ylabel="C$(flag)", label="k = $k", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+    #     push!(figs_CT, f_CT)
+    # end
+
+	# Correlation per time window.
+    figs_CT_arr = []
+    for s in 1:size(CT_arr,4)
+		tw = dict[:t_samp_list][s]
+        # f_ω = plot(ω_list[s,:], frame=:box, xlabel="k", ylabel="w max", label="Time window = $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+        # push!(figs_ω, f_ω)
+
+        # f_freq = plot(freq_list[:,s], frame=:box, xlabel="k", ylabel="freq max (1/$dim)", label="Time window = $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+        # push!(figs_freq, f_freq)
+
+        for k in 1:size(CT_arr,2)
+			tw2 = Int(floor(tw/2))
+            f_CT_arr = plot(CT_arr[1:tw2,k,2,s], CT_arr[1:tw2,k,1,s], frame=:box, xlabel="time ($dim)", ylabel="C$(flag)", label="k = $k, Time Window $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+            push!(figs_CT_arr, f_CT_arr)
+        end
+    end
+
+	fig_name = split(dict[:title],".")[1]
+	# savefig(plot(figs_CT..., size=(1500,900)), dict[:PathOut] * "/" * fig_name * "_C$(flag).png")
+
 	savefig(plot(figs_CT_arr..., size=(2500,1900)), dict[:PathOut] * "/" * fig_name * "_C$(flag)_arr.png")
 end

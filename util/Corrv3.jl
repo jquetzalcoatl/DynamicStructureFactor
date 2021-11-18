@@ -4,6 +4,29 @@ using Statistics, FFTW, LinearAlgebra#, JLD
 include("./inNout.jl")
 include("./corrFunctions.jl")
 
+mutable struct structureFactor
+	ωT_list
+	freqT_list
+	CT_mixedWindows
+	CT_arr
+
+	ωL_list
+	freqL_list
+	CL_mixedWindows
+	CL_arr
+
+	ω_list
+	freq_list
+	C_mixedWindows
+	C_arr
+
+	CL_Im_mixedWindows
+	CL_Im_arr
+
+	CT_Im_mixedWindows
+	CT_Im_arr
+end
+
 #=
 #Loading Functions
 =#
@@ -116,24 +139,26 @@ function do_the_fou(CT_av, CTIm_av, tmax; kmin = 1, kmax = 10,
         CT_av, CTIm_av = reshape(mean(CT_av,dims=1),kmax-kmin+1,tmax), reshape(mean(CTIm_av,dims=1),kmax-kmin+1,tmax)
         CT_FT = abs.(hcat(fft.([CT_av[i,:] for i in 1:kmax-kmin+1])...))
         CTIm_FT = abs.(hcat(fft.([CTIm_av[i,:] for i in 1:kmax-kmin+1])...))
-        return CT_FT, CTIm_FT
+        # return CT_FT, CTIm_FT
+		return CT_FT, Array(transpose(CTIm_av))
     else
         return reshape(mean(CT_av,dims=1),kmax-kmin+1,tmax), reshape(mean(CTIm_av,dims=1),kmax-kmin+1,tmax)
     end
 end
 
 function get_ω_sample(data, dict, c::Bool)
-	# data_samp_period=dict[:dt]
-    # tsamp = Int(floor(t_max/Δs))
-    # t_samp_list = t_samp_list == 0 ? [1000,2000,5000] : t_samp_list
-    # n_samp = Int.(floor.(t_max ./ dict[:t_samp_list]))
 
     ωT_list = zeros(size(dict[:t_samp_list],1),dict[:knum][2]-dict[:knum][1] + 1)
 	ωL_list = zeros(size(dict[:t_samp_list],1),dict[:knum][2]-dict[:knum][1] + 1)
+	ωTim_list = zeros(size(dict[:t_samp_list],1),dict[:knum][2]-dict[:knum][1] + 1)
+	ωLim_list = zeros(size(dict[:t_samp_list],1),dict[:knum][2]-dict[:knum][1] + 1)
+	ω_list = zeros(size(dict[:t_samp_list],1),dict[:knum][2]-dict[:knum][1] + 1)
 	CT_arr = zeros(maximum(dict[:t_samp_list]),dict[:knum][2]-dict[:knum][1] + 1,2,size(dict[:t_samp_list],1))
 	CL_arr = zeros(maximum(dict[:t_samp_list]),dict[:knum][2]-dict[:knum][1] + 1,2,size(dict[:t_samp_list],1))
+	CT_Im_arr = zeros(maximum(dict[:t_samp_list]),dict[:knum][2]-dict[:knum][1] + 1,2,size(dict[:t_samp_list],1))
+	CL_Im_arr = zeros(maximum(dict[:t_samp_list]),dict[:knum][2]-dict[:knum][1] + 1,2,size(dict[:t_samp_list],1))
+	C_arr = zeros(maximum(dict[:t_samp_list]),dict[:knum][2]-dict[:knum][1] + 1,2,size(dict[:t_samp_list],1))
 
-    # for j in 1:size(t_samp_list,1)
 	for (j, ts) in enumerate(dict[:t_samp_list])
         # ts = t_samp_list[j]
         d_part, t_m = partition_data(data, ts, dict)
@@ -143,35 +168,49 @@ function get_ω_sample(data, dict, c::Bool)
             break
         end
 
-        CT, _ = get_Corr_over_all_samples(d_part, dict; in_Fourier = c, flag = "Transversal")
-		CL, _ = get_Corr_over_all_samples(d_part, dict; in_Fourier = c, flag = "Longitudinal")
+        CT, CT_Im = get_Corr_over_all_samples(d_part, dict; in_Fourier = c, flag = "Transversal")
+		CL, CL_Im = get_Corr_over_all_samples(d_part, dict; in_Fourier = c, flag = "Longitudinal")
+		C_total = CT .+ CL
 
 
 		ωlim = Int(floor(ts/2))
 
-        ωT_list[j,:] = vcat([findall(x->x == maximum(CT[1:ωlim,i]), CT[1:ωlim,i]) for i in 1:size(CT,2)]...)
+		gatherDataToArrays(j, ωlim, CT, ts, dict, ωT_list, CT_arr)
+		gatherDataToArrays(j, ωlim, CL, ts, dict, ωL_list, CL_arr)
+		gatherDataToArrays(j, ωlim, CT_Im, ts, dict, ωTim_list, CT_Im_arr, in_fourier=false)
+		gatherDataToArrays(j, ωlim, CL_Im, ts, dict, ωLim_list, CL_Im_arr, in_fourier=false)
+		gatherDataToArrays(j, ωlim, C_total, ts, dict, ω_list, C_arr)
 
-		freqT = hcat([[l for l in 0:size(CT,1)-1] ./ (ts * dict[:dt]) for i in 1:size(CT,2)]...)
-		CT_arr[1:size(CT,1),:,:,j] = cat(CT,freqT, dims=3)
-
-		# ωLlim = Int(floor(ts/2))
-        ωL_list[j,:] = vcat([findall(x->x == maximum(CL[1:ωlim,i]), CL[1:ωlim,i]) for i in 1:size(CL,2)]...)
-
-		freqL = hcat([[l for l in 0:size(CL,1)-1] ./ (ts * dict[:dt]) for i in 1:size(CT,2)]...)
-		CL_arr[1:size(CL,1),:,:,j] = cat(CL,freqL, dims=3)
     end
     freqT_list = hcat([(ωT_list[i,:] .- 1) ./(ts * dict[:dt]) for (i,ts) in enumerate(dict[:t_samp_list])]...)
 	freqL_list = hcat([(ωL_list[i,:] .- 1) ./(ts * dict[:dt]) for (i,ts) in enumerate(dict[:t_samp_list])]...)
+	freq_list = hcat([(ω_list[i,:] .- 1) ./(ts * dict[:dt]) for (i,ts) in enumerate(dict[:t_samp_list])]...)
 
-	CT_mixedWindows = arrange_Corr(CT_arr; len=Int(floor(minimum(dict[:t_samp_list])/2)), Δk = dict[:knum][2]-dict[:knum][1] + 1)
-	CT_mixedWindows = envelope.([CT_mixedWindows[i,:,:] for i in 1:dict[:knum][2]-dict[:knum][1] + 1])
-	CT_mixedWindows = permutedims(cat(CT_mixedWindows...,dims=3),(3,1,2))
+	CT_mixedWindows = getMixedWindows(CT_arr, dict)
+	CL_mixedWindows = getMixedWindows(CL_arr, dict)
+	CT_Im_mixedWindows = getMixedWindows(CT_Im_arr, dict)
+	CL_Im_mixedWindows = getMixedWindows(CL_Im_arr, dict)
+	C_mixedWindows = getMixedWindows(C_arr, dict)
 
-	CL_mixedWindows = arrange_Corr(CL_arr; len=Int(floor(minimum(dict[:t_samp_list])/2)), Δk = dict[:knum][2]-dict[:knum][1] + 1)
-	CL_mixedWindows = envelope.([CL_mixedWindows[i,:,:] for i in 1:dict[:knum][2]-dict[:knum][1] + 1])
-	CL_mixedWindows = permutedims(cat(CL_mixedWindows...,dims=3),(3,1,2))
+	# ωT_list, freqT_list, CT_mixedWindows, CT_arr, ωL_list, freqL_list, CL_mixedWindows, CL_arr
+	structureFactor(ωT_list, freqT_list, CT_mixedWindows, CT_arr, ωL_list, freqL_list, CL_mixedWindows, CL_arr, ω_list,	freq_list, C_mixedWindows, C_arr, undef, CL_Im_arr, undef, CT_Im_arr)
+end
 
-	ωT_list, freqT_list, CT_mixedWindows, CT_arr, ωL_list, freqL_list, CL_mixedWindows, CL_arr
+function gatherDataToArrays(j, ωlim, C, ts, dict, ω_list, C_arr; in_fourier=true)
+	if in_fourier
+		ω_list[j,:] = vcat([findall(x->x == maximum(C[1:ωlim,i]), C[1:ωlim,i]) for i in 1:size(C,2)]...)
+		freq = hcat([[l for l in 0:size(C,1)-1] ./ (ts * dict[:dt]) for i in 1:size(C,2)]...)
+		C_arr[1:size(C,1),:,:,j] = cat(C,freq, dims=3)
+	else
+		C_arr[1:size(C,1),:,:,j] = cat(C, hcat([dict[:dt] .* collect(1:size(C,1)) for i in 1:size(C,2)]...), dims=3)
+	end
+end
+
+function getMixedWindows(C_arr, dict)
+	C_mixedWindows = arrange_Corr(C_arr; len=Int(floor(minimum(dict[:t_samp_list])/2)), Δk = dict[:knum][2]-dict[:knum][1] + 1)
+	C_mixedWindows = envelope.([C_mixedWindows[i,:,:] for i in 1:dict[:knum][2]-dict[:knum][1] + 1])
+	C_mixedWindows = permutedims(cat(C_mixedWindows...,dims=3),(3,1,2))
+	C_mixedWindows
 end
 
 function arrange_Corr(CT_arr; len=30, Δk=10)
@@ -214,8 +253,6 @@ function get_freq_max(CT_arr)
 end
 
 function get_freqs(dict; test=false, ω = 0.0002, Δt = 10.0, δ = 0.5)
-    #dict for t_MAX, L_char,, num_part
-
     if test
 		t_MAX = dict[:t_max]
 	    L_char = dict[:L_char]
@@ -228,25 +265,33 @@ function get_freqs(dict; test=false, ω = 0.0002, Δt = 10.0, δ = 0.5)
     end
 
     get_ω_sample(d, dict, true)
-	# get_ω_sample(num_part, t_MAX, d, [500,1000], true; L=L_char)
 end
 
 function main(dict)
 	# dim = dict[:dim]
 	@info "Starting..."
-	ω_list, freq_list, CT_mixedWindows, CT_arr, ωL_list, freqL_list, CL_mixedWindows, CL_arr = get_freqs(dict)
+	# ω_list, freq_list, CT_mixedWindows, CT_arr, ωL_list, freqL_list, CL_mixedWindows, CL_arr = get_freqs(dict)
+	s = get_freqs(dict)
 	@info "Computation done"
 
 	@info "Generating Plots..."
-	savePlots(ω_list, freq_list, CT_mixedWindows, CT_arr, dict, flag="T")
-	savePlots(ωL_list, freqL_list, CL_mixedWindows, CL_arr, dict, flag="L")
+	savePlots(s.ωT_list, s.freqT_list, s.CT_mixedWindows, s.CT_arr, dict, flag="T")
+	savePlots(s.ωL_list, s.freqL_list, s.CL_mixedWindows, s.CL_arr, dict, flag="L")
+	savePlots(s.ω_list, s.freq_list, s.C_mixedWindows, s.C_arr, dict, flag="total")
+	savePlots(s.CL_Im_arr, dict, flag="L_im")
+	savePlots(s.CT_Im_arr, dict, flag="T_im")
 
 	@info "Saving Data..."
-	saveData(ω_list, freq_list, CT_mixedWindows, CT_arr, dict, flag="T")
-	saveData(ωL_list, freqL_list, CL_mixedWindows, CL_arr, dict, flag="L")
+	saveData(s.ωT_list, s.freqT_list, s.CT_mixedWindows, s.CT_arr, dict, flag="T")
+	saveData(s.ωL_list, s.freqL_list, s.CL_mixedWindows, s.CL_arr, dict, flag="L")
+	saveData(s.ω_list, s.freq_list, s.C_mixedWindows, s.C_arr, dict, flag="total")
+	saveData(s.CL_Im_arr, dict, flag="L_im")
+	saveData(s.CT_Im_arr, dict, flag="T_im")
 	@info "Done!"
 	writedlm(dict[:PathOut] * "/" * split(dict[:title],".")[1] * "_freq_mixedWindows_T.dat",
-			get_freq_max(CT_mixedWindows))
+			get_freq_max(s.CT_mixedWindows))
 	writedlm(dict[:PathOut] * "/" * split(dict[:title],".")[1] * "_freq_mixedWindows_L.dat",
-			get_freq_max(CL_mixedWindows))
+			get_freq_max(s.CL_mixedWindows))
+	writedlm(dict[:PathOut] * "/" * split(dict[:title],".")[1] * "_freq_mixedWindows_total.dat",
+			get_freq_max(s.C_mixedWindows))
 end
