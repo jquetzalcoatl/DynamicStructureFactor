@@ -188,8 +188,8 @@ function get_ω_sample(data, dict, c::Bool)
 
 	CT_mixedWindows = getMixedWindows(CT_arr, dict)
 	CL_mixedWindows = getMixedWindows(CL_arr, dict)
-	CT_Im_mixedWindows = getMixedWindows(CT_Im_arr, dict)
-	CL_Im_mixedWindows = getMixedWindows(CL_Im_arr, dict)
+	# CT_Im_mixedWindows = getMixedWindows(CT_Im_arr, dict)
+	# CL_Im_mixedWindows = getMixedWindows(CL_Im_arr, dict)
 	C_mixedWindows = getMixedWindows(C_arr, dict)
 
 	# ωT_list, freqT_list, CT_mixedWindows, CT_arr, ωL_list, freqL_list, CL_mixedWindows, CL_arr
