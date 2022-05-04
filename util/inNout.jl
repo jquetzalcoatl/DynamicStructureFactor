@@ -52,36 +52,62 @@ function parseCommandLine(; dir=0)
 				help = "List of time window of samples. Should be space separated"
 				nargs = '*'
 				arg_type = Int64
-				default = [500, 1000]
+				default = [100, 500, 1000]
 			"--knum", "-k"
 				help = "List with kmin and kmax. Should be space separated"
 				nargs = '*'
 				arg_type = Int64
 				default = [1, 10]
+			"--test"
+				help = "Test code"
+				arg_type = Bool
+				default = false
 	   end
 
         return parse_args(s) # the result is a Dict{String,Any}
 end
 
 function init_dict(kwargs)
-	filename = kwargs["Filename"]
-    path_to_file = kwargs["pathIn"] * "/" * kwargs["Filename"]
-    pathout = kwargs["pathOut"] == "temp" ? kwargs["pathIn"] * "/" * split(kwargs["Filename"],".")[1] * "/" : kwargs["pathOut"]
+	if kwargs["test"] == false
+		filename = kwargs["Filename"]
+		path_to_file = kwargs["pathIn"] * "/" * kwargs["Filename"]
+	    pathout = kwargs["pathOut"] == "temp" ? kwargs["pathIn"] * "/" * split(kwargs["Filename"],".")[1] * "/" : kwargs["pathOut"]
+
+		dict = Dict()
+	    dict[:PathIn] = path_to_file
+	    dict[:PathOut] = pathout
+		dict[:t_max_parsed] = kwargs["t_max"]
+		dict[:partitions] = Dict([(:t_samp, []), (:samples, []), (:t_max, [])])
+	    dict[:L_char] = kwargs["Lchar"]
+		dict[:num_part] = kwargs["n"]
+	    dict[:title] = filename
+		dict[:dt] = kwargs["dt"]
+		dict[:dim] = kwargs["dim"]
+		dict[:t_samp_list] = kwargs["time_window"]
+		dict[:knum] = kwargs["knum"]
+		dict[:mass] = kwargs["mass"]
+	else
+		kwargs["Filename"] = "Test"
+		filename = kwargs["Filename"]
+		path_to_file = kwargs["pathIn"] * "/" * kwargs["Filename"]
+	    pathout = kwargs["pathIn"] * "/" * kwargs["Filename"] * "/"
+		dict = Dict()
+	    dict[:PathIn] = path_to_file
+	    dict[:PathOut] = pathout
+		dict[:t_max_parsed] = kwargs["t_max"]
+		dict[:partitions] = Dict([(:t_samp, []), (:samples, []), (:t_max, [])])
+	    dict[:L_char] = 10 #kwargs["Lchar"]
+		dict[:num_part] = 1000 #kwargs["n"]
+	    dict[:title] = filename
+		dict[:dt] = 0.01 #kwargs["dt"]
+		dict[:dim] = kwargs["dim"]
+		dict[:t_samp_list] = Array{Int64}([1] ./ dict[:dt]) #kwargs["time_window"]
+		dict[:knum] = kwargs["knum"]
+		dict[:mass] = kwargs["mass"]
+		dict[:t_max] = 10
+	end
 
     isdir(pathout) || mkdir(pathout)
-    dict = Dict()
-    dict[:PathIn] = path_to_file
-    dict[:PathOut] = pathout
-	dict[:t_max_parsed] = kwargs["t_max"]
-	dict[:partitions] = Dict([(:t_samp, []), (:samples, []), (:t_max, [])])
-    dict[:L_char] = kwargs["Lchar"]
-	dict[:num_part] = kwargs["n"]
-    dict[:title] = filename
-	dict[:dt] = kwargs["dt"]
-	dict[:dim] = kwargs["dim"]
-	dict[:t_samp_list] = kwargs["time_window"]
-	dict[:knum] = kwargs["knum"]
-	dict[:mass] = kwargs["mass"]
 
     @save (dict[:PathOut] * "Dict.bson") dict
     return dict
@@ -178,7 +204,8 @@ function savePlots(ω_list, freq_list, CT, CT_arr, dict; flag="T", mixedWindows=
 	# Correlation in mixed windows
 	figs_CT = []
     for k in 1:size(CT,1)
-        f_CT = plot(CT[k,1:200,1],CT[k,1:200,2], frame=:box, xlabel="freq (1/$dim)", ylabel="C$(flag)", label="k = $k", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+		wmaxBound = minimum([200, size(CT,2)])
+        f_CT = plot(CT[k,1:wmaxBound,1],CT[k,1:wmaxBound,2], frame=:box, xlabel="freq (1/$dim)", ylabel="C$(flag)", label="k = $k", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
         push!(figs_CT, f_CT)
     end
 

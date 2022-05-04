@@ -3,6 +3,7 @@ using Statistics, FFTW, LinearAlgebra#, JLD
 # using DelimitedFiles, ArgParse,
 include("./inNout.jl")
 include("./corrFunctions.jl")
+include("./test.jl")
 
 mutable struct structureFactor
 	ωT_list
@@ -258,8 +259,8 @@ function get_freqs(dict; test=false, ω = 0.0002, Δt = 10.0, δ = 0.5)
 	    L_char = dict[:L_char]
 	    num_part = dict[:num_part]
 		t_samp_list = dict[:t_samp_list]
-        d, M = test_data(steps = t_MAX + 2000, thermal_steps=2000, L = L_char,
-				Δt = dict[:dt], N=num_part, arrange = "Crystal", typeHessian="random")
+		d, M = test_data(steps = Int(t_MAX/dict[:dt]), thermal_steps=0, L = L_char,
+		        Δt = dict[:dt], N=num_part, arrange = "Crystal", typeHessian="random")
     else
         d = load_data(dict)
     end
@@ -267,11 +268,11 @@ function get_freqs(dict; test=false, ω = 0.0002, Δt = 10.0, δ = 0.5)
     get_ω_sample(d, dict, true)
 end
 
-function main(dict)
+function main(dict; test=false)
 	# dim = dict[:dim]
 	@info "Starting..."
 	# ω_list, freq_list, CT_mixedWindows, CT_arr, ωL_list, freqL_list, CL_mixedWindows, CL_arr = get_freqs(dict)
-	s = get_freqs(dict)
+	s = get_freqs(dict; test=test)
 	@info "Computation done"
 
 	@info "Generating Plots..."
