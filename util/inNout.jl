@@ -205,7 +205,7 @@ function savePlots(ω_list, freq_list, CT, CT_arr, dict; flag="T", mixedWindows=
 	figs_CT = []
     for k in 1:size(CT,1)
 		wmaxBound = minimum([200, size(CT,2)])
-        f_CT = plot(CT[k,1:wmaxBound,1],CT[k,1:wmaxBound,2], frame=:box, xlabel="freq (1/$dim)", ylabel="C$(flag)", label="k = $k", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+        f_CT = plot(CT[k,1:wmaxBound,1],CT[k,1:wmaxBound,2], frame=:box, xlabel="freq (1/$dim)", ylabel="C$(flag)", label="k = $k", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0, legend=:outertop)
         push!(figs_CT, f_CT)
     end
 
@@ -215,15 +215,15 @@ function savePlots(ω_list, freq_list, CT, CT_arr, dict; flag="T", mixedWindows=
     figs_CT_arr = []
     for s in 1:size(ω_list,1)
 		tw = dict[:t_samp_list][s]
-        f_ω = plot(ω_list[s,:], frame=:box, xlabel="k", ylabel="w max", label="Time window = $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+        f_ω = plot(ω_list[s,:], frame=:box, xlabel="k", ylabel="w max", label="Time window = $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0, legend=:outertop)
         push!(figs_ω, f_ω)
 
-        f_freq = plot(freq_list[:,s], frame=:box, xlabel="k", ylabel="freq max (1/$dim)", label="Time window = $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+        f_freq = plot(freq_list[:,s], frame=:box, xlabel="k", ylabel="freq max (1/$dim)", label="Time window = $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0, legend=:outertop)
         push!(figs_freq, f_freq)
 
         for k in 1:size(CT_arr,2)
 			tw2 = Int(floor(tw/2))
-            f_CT_arr = plot(CT_arr[1:tw2,k,2,s], CT_arr[1:tw2,k,1,s], frame=:box, xlabel="freq (1/$dim)", ylabel="C$(flag)", label="k = $k, Time Window $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+            f_CT_arr = plot(CT_arr[1:tw2,k,2,s], CT_arr[1:tw2,k,1,s], frame=:box, xlabel="freq (1/$dim)", ylabel="C$(flag)", label="k = $k, Time Window $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0, legend=:outertop)
             push!(figs_CT_arr, f_CT_arr)
         end
     end
@@ -258,7 +258,7 @@ function savePlots(CT_arr, dict; flag="T_im", mixedWindows=true)
 
         for k in 1:size(CT_arr,2)
 			tw2 = Int(floor(tw/2))
-            f_CT_arr = plot(CT_arr[1:tw2,k,2,s], CT_arr[1:tw2,k,1,s], frame=:box, xlabel="time ($dim)", ylabel="C$(flag)", label="k = $k, Time Window $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0)
+            f_CT_arr = plot(CT_arr[1:tw2,k,2,s], CT_arr[1:tw2,k,1,s], frame=:box, xlabel="time ($dim)", ylabel="C$(flag)", label="k = $k, Time Window $tw", margin = 5Plots.mm, ms=4, markershapes = :circle, markerstrokewidth=0, legend=:outertop)
             push!(figs_CT_arr, f_CT_arr)
         end
     end
